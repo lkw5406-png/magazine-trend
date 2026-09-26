@@ -4,7 +4,11 @@
 - 시각 참고 중심 (2026-09-26 사장님 요청): 트렌드마다 무드보드, 키워드·컬러마다 사진 줄, 런웨이 사진 카드, 기사 사진 카드
 - 사진 파일은 저장하지 않고 매체 주소를 그대로 보여줌(저작권). 글은 제목 + Claude 요약 + 원문 링크만.
 
-사용법: python tools/build_report.py [--date YYYY-MM-DD]
+- 주간(매주 자동): docs/index.html, docs/reports/날짜.html / 월간(과거 1~8월, 2026-09-26 사장님 결정): docs/monthly/index.html, docs/monthly/reports/YYYY-MM.html
+  맨 위 [주간 | 월간] 전환으로 같은 링크에서 오감.
+
+사용법: python tools/build_report.py [--date YYYY-MM-DD]      주간 (그 날까지 7일)
+        python tools/build_report.py --month YYYY-MM          월간
 """
 from __future__ import annotations
 
@@ -16,7 +20,9 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from common import ARTICLES_PATH, DOCS_DIR, LABELS_PATH, NOTES_PATH, SOURCES_PATH, load_json, today_kst
+from common import ARTICLES_PATH, DATA_DIR, DOCS_DIR, LABELS_PATH, NOTES_PATH, SOURCES_PATH, load_json, today_kst
+
+MONTHLY_NOTES_PATH = DATA_DIR / "monthly_notes.json"  # 월간 핵심 트렌드 문장 (Claude 작성), 키 = YYYY-MM
 
 LIST_FIELDS = ("items", "styles", "details", "colors", "materials", "brands")
 
@@ -32,6 +38,21 @@ SWATCH = {"블랙": "#111111", "화이트": "#f7f7f5", "아이보리/크림": "#
 def window(date: str, days: int = 7, back: int = 0) -> tuple[str, str]:
     end = datetime.fromisoformat(date) - timedelta(days=back)
     return (end - timedelta(days=days - 1)).strftime("%Y-%m-%d"), end.strftime("%Y-%m-%d")
+
+
+def month_span(month: str, back: int = 0) -> tuple[str, str]:
+    y, m = map(int, month.split("-"))
+    m -= back
+    while m < 1:
+        y, m = y - 1, m + 12
+    first = datetime(y, m, 1)
+    last = (first + timedelta(days=32)).replace(day=1) - timedelta(days=1)
+    return first.strftime("%Y-%m-%d"), last.strftime("%Y-%m-%d")
+
+
+def span(key: str, back: int = 0) -> tuple[str, str]:
+    """리포트 키 → 기간. 'YYYY-MM' = 월간, 'YYYY-MM-DD' = 주간(그 날까지 7일)."""
+    return month_span(key, back) if len(key) == 7 else window(key, back=7 * back)
 
 
 def rows_for(articles: dict, labels: dict, start: str, end: str, full: bool) -> list[dict]:
@@ -67,6 +88,9 @@ a { color: inherit; }
 header { display:flex; flex-wrap:wrap; gap:12px 24px; align-items:flex-end; justify-content:space-between; }
 header h1 { font-size:26px; margin:0 0 4px; letter-spacing:-.01em; }
 header p { margin:0; color:var(--ink-2); }
+.hright { display:flex; flex-wrap:wrap; gap:12px; align-items:flex-end; }
+.pill a.pl { font-weight:700; padding:6px 14px; border-radius:999px; text-decoration:none; color:var(--ink-2); }
+.pill a.pl[aria-current] { background:var(--accent); color:#fff; }
 .datepick { display:flex; flex-direction:column; gap:4px; font-size:12px; color:var(--muted); }
 .datepick select { font:inherit; font-size:15px; font-weight:600; color:var(--ink); background:var(--surface);
   border:1px solid var(--border); border-radius:10px; padding:8px 12px; min-width:170px; }
@@ -200,21 +224,21 @@ function summary(rows, prev) {
   const top = f => (count(rows, f)[0] || ['-', 0]);
   const [ti, tc] = top('items'), [cl, cc] = top('colors'), [mt, mc] = top('materials'), [st, sc] = top('styles');
   const srcs = new Set(rows.map(a => a.s)).size;
-  let h = `<section class="card"><h2>이번 주 한눈에</h2><p class="sub">${esc(D.period_note || '')}</p><div class="stats">
+  let h = `<section class="card"><h2>${D.u.cur} 한눈에</h2><p class="sub">${esc(D.period_note || '')}</p><div class="stats">
     <div class="stat"><div class="k">패션 기사</div><div class="v">${rows.length}개</div><div class="d">${srcs}개 매체</div></div>
     <div class="stat"><div class="k">가장 많이 나온 아이템</div><div class="v">${esc(ti)}</div><div class="d">기사 ${tc}개</div></div>
     <div class="stat"><div class="k">스타일</div><div class="v">${esc(st)}</div><div class="d">기사 ${sc}개</div></div>
     <div class="stat"><div class="k">컬러</div><div class="v"><span class="sw" style="background:${SW[cl] || 'var(--grid)'}"></span>${esc(cl)}</div><div class="d">기사 ${cc}개</div></div>
     <div class="stat"><div class="k">소재</div><div class="v">${esc(mt)}</div><div class="d">기사 ${mc}개</div></div>
   </div></section>`;
-  h += `<section class="card"><h2>이번 주 핵심 트렌드 · ${esc(state.g)}복</h2><p class="sub">매체 기사를 읽고 정리한 흐름. 사진을 누르면 원문 기사로 이동해요.</p><div class="trends">`;
+  h += `<section class="card"><h2>${D.u.cur} 핵심 트렌드 · ${esc(state.g)}복</h2><p class="sub">매체 기사를 읽고 정리한 흐름. 사진을 누르면 원문 기사로 이동해요.</p><div class="trends">`;
   const used = new Set();
   h += notes.map(n => {
     const ph = photos(rows, n.keys, 8, used);
     ph.forEach(a => used.add(imgKey(a.img)));
     return `<div class="trend"><div><h3>${esc(n.title)}</h3><p>${esc(n.text)}</p><div class="chips">${n.keys.map(k => `<span class="chip">${esc(k)}</span>`).join('')}</div></div>
       <div class="board">${ph.length ? ph.map(a => `<a href="${esc(a.u)}" target="_blank" rel="noopener" title="${esc(a.t)}">${img(a)}<span>${esc(a.s)}</span></a>`).join('') : '<p class="empty">이 조건에 맞는 사진이 없어요.</p>'}</div></div>`;
-  }).join('') || '<p class="empty">이번 주 정리 문장이 없어요.</p>';
+  }).join('') || `<p class="empty">${D.u.cur} 정리 문장이 없어요.</p>`;
   return h + '</div></section>';
 }
 function runway(rows) {
@@ -231,7 +255,7 @@ function runway(rows) {
       <div class="brand">${esc(b)}</div><div class="meta">${esc(a.sea || '')} · 리뷰 ${list.length}개 · ${esc([...new Set(list.map(x => x.s))].join(', '))}</div>
       <div class="sum">${esc(a.sum)}</div><div class="chips">${kws.map(k => `<span class="chip">${esc(k)}</span>`).join('')}</div></div></a>`;
   });
-  return `<section class="card"><h2>런웨이 · 컬렉션</h2><p class="sub">이번 주 컬렉션 리뷰를 브랜드별로 묶음 (리뷰 많은 순). 카드를 누르면 대표 리뷰 원문.</p>
+  return `<section class="card"><h2>런웨이 · 컬렉션</h2><p class="sub">${D.u.cur} 컬렉션 리뷰를 브랜드별로 묶음 (리뷰 많은 순). 카드를 누르면 대표 리뷰 원문.</p>
     ${cards.length ? `<div class="rgrid">${cards.join('')}</div>` : '<p class="empty">이 조건의 런웨이 기사가 없어요.</p>'}</section>`
     + kwBlock(rw, [], 'styles', '런웨이에서 나온 스타일', '컬렉션 리뷰에 나온 스타일 순위', 8)
     + kwBlock(rw, [], 'items', '런웨이에서 나온 아이템', '컬렉션 리뷰에 나온 아이템 순위', 8);
@@ -254,7 +278,7 @@ function render() {
   document.querySelectorAll('[data-tab]').forEach(b => b.setAttribute('aria-selected', b.dataset.tab === state.tab));
   const rows = pick(D.rows), prev = pick(D.prev);
   const v = document.getElementById('view');
-  const prevNote = prev.length ? '지난주 대비 늘어난 만큼 ▲ 표시.' : '지난주 기록이 쌓이면 변화(▲·새로 등장)가 표시돼요.';
+  const prevNote = prev.length ? D.u.prev + ' 대비 늘어난 만큼 ▲ 표시.' : D.u.prev + ' 기록이 쌓이면 변화(▲·새로 등장)가 표시돼요.';
   if (state.tab === 'sum') v.innerHTML = summary(rows, prev);
   else if (state.tab === 'kw') v.innerHTML = kwBlock(rows, prev, 'items', '뜨는 아이템', '기사에 가장 많이 나온 아이템. ' + prevNote)
       + kwBlock(rows, prev, 'styles', '스타일 키워드', '기사에 가장 많이 나온 스타일·무드. ' + prevNote)
@@ -270,32 +294,36 @@ document.querySelectorAll('[data-r]').forEach(b => b.onclick = () => { state.r =
 document.querySelectorAll('[data-tab]').forEach(b => b.onclick = () => { state.tab = b.dataset.tab; state.kind = '전체'; render(); window.scrollTo({top: 0}); });
 const sel = document.getElementById('datesel');
 fetch(D.root + 'dates.json').then(r => r.json()).then(ds => {
-  sel.innerHTML = ds.map(d => `<option value="${d}"${d === D.date ? ' selected' : ''}>${d.replace(/-/g, '.')} 주</option>`).join('');
+  sel.innerHTML = ds.map(d => `<option value="${d}"${d === D.date ? ' selected' : ''}>${d.replace(/-/g, '.')} ${D.u.sel}</option>`).join('');
 }).catch(() => {});
 sel.onchange = () => { location.href = D.root + 'reports/' + sel.value + '.html'; };
 render();
 """
 
 
-def page(date: str, rows: list, prev: list, notes: dict, kinds: list, root: str, n_sources: int) -> str:
-    start, end = window(date)
-    data = {"date": date, "root": root, "rows": rows, "prev": prev, "swatch": SWATCH, "kinds": kinds,
+def page(date: str, rows: list, prev: list, notes: dict, kinds: list, root: str, n_sources: int, site: str) -> str:
+    """root = 이 리포트 종류(주간/월간)의 맨 위 폴더까지 상대 경로, site = docs/ 까지 상대 경로."""
+    start, end = span(date)
+    monthly = len(date) == 7
+    u = {"cur": "이번 달", "prev": "지난달", "sel": "월"} if monthly else {"cur": "이번 주", "prev": "지난주", "sel": "주"}
+    data = {"date": date, "root": root, "rows": rows, "prev": prev, "swatch": SWATCH, "kinds": kinds, "u": u,
             "notes": {g: notes.get(g, []) for g in ("여성", "남성")}, "period_note": notes.get("period_note", "")}
     blob = json.dumps(data, ensure_ascii=False).replace("</", "<\\/")
-    tabs = [("sum", "이번 주 요약"), ("kw", "뜨는 키워드·아이템"), ("cm", "컬러·소재"), ("rw", "런웨이"), ("art", "기사 모음")]
+    tabs = [("sum", f"{u['cur']} 요약"), ("kw", "뜨는 키워드·아이템"), ("cm", "컬러·소재"), ("rw", "런웨이"), ("art", "기사 모음")]
     return f"""<!doctype html>
 <html lang="ko">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>매거진 트렌드 리포트</title>
-<meta name="description" content="국내·해외 패션지·남성지·트렌드 매체 {n_sources}곳의 주간 패션 트렌드 ({start}~{end})">
+<meta name="description" content="국내·해외 패션지·남성지·트렌드 매체 {n_sources}곳의 {'월간' if monthly else '주간'} 패션 트렌드 ({start}~{end})">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%23111'/><text x='16' y='22' font-size='16' text-anchor='middle' fill='white' font-family='sans-serif'>M</text></svg>">
 <style>{CSS}</style>
 </head>
 <body><div class="wrap">
 <header><div><h1>매거진 트렌드 리포트</h1>
 <p>{start.replace('-', '.')} ~ {end.replace('-', '.')} · 국내·해외 패션지·남성지·트렌드 매체 {n_sources}곳의 패션 기사</p></div>
-<label class="datepick">지난 리포트<select id="datesel"><option>{date.replace('-', '.')} 주</option></select></label></header>
+<div class="hright"><div class="pill" role="group" aria-label="리포트 종류"><a class="pl" href="{site}index.html"{'' if monthly else ' aria-current="page"'}>주간</a><a class="pl" href="{site}monthly/index.html"{' aria-current="page"' if monthly else ''}>월간</a></div>
+<label class="datepick">지난 리포트<select id="datesel"><option>{date.replace('-', '.')} {u['sel']}</option></select></label></div></header>
 <nav class="topbar" aria-label="보기 전환">
 <div class="pill" role="group" aria-label="성별"><button data-g="여성">여성</button><button data-g="남성">남성</button></div>
 <div class="pill" role="group" aria-label="지역"><button data-r="전체">전체</button><button data-r="국내">국내</button><button data-r="해외">해외</button></div>
@@ -312,28 +340,34 @@ Vogue.com·GQ.com 등 AI 이용을 막은 매체는 넣지 않았습니다.</foo
 
 
 def build(date: str) -> Path:
+    monthly = len(date) == 7
+    base = DOCS_DIR / "monthly" if monthly else DOCS_DIR
     articles, labels = load_json(ARTICLES_PATH, {}), load_json(LABELS_PATH, {})
-    notes = load_json(NOTES_PATH, {}).get(date, {})
+    notes = load_json(MONTHLY_NOTES_PATH if monthly else NOTES_PATH, {}).get(date, {})
     kinds = load_json(Path(__file__).resolve().parent / "trend_keywords.json", {})["article_kind"]
     n_sources = len(load_json(SOURCES_PATH, {})["sources"])
-    rows = rows_for(articles, labels, *window(date), full=True)
-    prev = rows_for(articles, labels, *window(date, back=7), full=False)
-    (DOCS_DIR / "reports").mkdir(parents=True, exist_ok=True)
-    (DOCS_DIR / "reports" / f"{date}.html").write_text(page(date, rows, prev, notes, kinds, "../", n_sources), encoding="utf-8")
-    dates = sorted({p.stem for p in (DOCS_DIR / "reports").glob("*.html")}, reverse=True)
-    (DOCS_DIR / "dates.json").write_text(json.dumps(dates), encoding="utf-8")
+    rows = rows_for(articles, labels, *span(date), full=True)
+    prev = rows_for(articles, labels, *span(date, back=1), full=False)
+    (base / "reports").mkdir(parents=True, exist_ok=True)
+    (base / "reports" / f"{date}.html").write_text(
+        page(date, rows, prev, notes, kinds, "../", n_sources, "../../" if monthly else "../"), encoding="utf-8")
+    dates = sorted({p.stem for p in (base / "reports").glob("*.html")}, reverse=True)
+    (base / "dates.json").write_text(json.dumps(dates), encoding="utf-8")
     if date == dates[0]:
-        out = DOCS_DIR / "index.html"
-        out.write_text(page(date, rows, prev, notes, kinds, "", n_sources), encoding="utf-8")
-    print(f"리포트 생성: 패션 기사 {len(rows)}개 (지난주 {len(prev)}개) → docs/reports/{date}.html" +
-          (" + docs/index.html" if date == dates[0] else ""))
-    return DOCS_DIR / "index.html"
+        (base / "index.html").write_text(page(date, rows, prev, notes, kinds, "", n_sources, "../" if monthly else ""),
+                                         encoding="utf-8")
+    rel = base.relative_to(DOCS_DIR.parent).as_posix()
+    print(f"리포트 생성: 패션 기사 {len(rows)}개 ({'지난달' if monthly else '지난주'} {len(prev)}개) → {rel}/reports/{date}.html"
+          + (f" + {rel}/index.html" if date == dates[0] else ""))
+    return base / "index.html"
 
 
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--date", default=today_kst())
-    build(ap.parse_args().date)
+    ap.add_argument("--month", help="월간 리포트 YYYY-MM")
+    args = ap.parse_args()
+    build(args.month or args.date)
     return 0
 
 

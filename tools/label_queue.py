@@ -13,6 +13,7 @@
   python tools/label_queue.py --next [--size 60]     다음 묶음을 .tmp/to_label.json 으로 (이번 주 기사 중 판정 안 된 것)
   python tools/label_queue.py --merge 파일.json      Claude가 쓴 판정 묶음을 검사 후 판정표에 합침
   python tools/label_queue.py --check                전체 판정표 검사 + 남은 개수
+  (월간은 --date 대신 --month YYYY-MM)
 """
 from __future__ import annotations
 
@@ -67,9 +68,14 @@ def main() -> int:
     ap.add_argument("--size", type=int, default=60)
     ap.add_argument("--merge")
     ap.add_argument("--check", action="store_true")
+    ap.add_argument("--month", help="월간: 이 달(YYYY-MM) 기사 전체 (--date 대신)")
     args = ap.parse_args()
     articles, labels, v = load_json(ARTICLES_PATH, {}), load_json(LABELS_PATH, {}), vocab()
-    start, end = week_window(args.date)
+    if args.month:
+        from build_report import month_span
+        start, end = month_span(args.month)
+    else:
+        start, end = week_window(args.date)
     week = {k: a for k, a in articles.items() if start <= a["date"] <= end}
     todo = sorted((k for k in week if k not in labels), key=lambda k: (week[k]["source"], week[k]["published"]))
 

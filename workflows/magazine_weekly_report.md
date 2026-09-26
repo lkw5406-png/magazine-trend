@@ -46,6 +46,19 @@ Python: 사장님 PC는 `C:/Users/이채은/.local/bin/python3.14.exe` (Windows�
 - **소개글(기사 앞부분)은 공개 저장소에 올리지 않음** (2026-09-26 사장님 결정): `.tmp/snippets.json`(로컬)에만. 자동 수집으로 모인 기사는 소개글이 없으므로 `label_queue.py --next`가 판정할 묶음만 기사 페이지 공식 소개(og:description)를 받아 채움(60개에 약 2분).
 - 리포트는 같은 사진을 한 번만 보여줌: 하입비스트 영문·코리아판은 같은 사진을 다른(인코딩된) 주소로 씀 → 주소를 풀어 파일 이름으로 비교. 같은 사진 + 같은 첫 브랜드면 같은 기사로 합쳐 한 번만 셈("외 하입비스트 코리아" 표시).
 
+## 월간 리포트 (과거 1~8월, 2026-09-26 사장님 결정)
+처음엔 1월부터 주별로 채우려다(주당 대표 100개) 사장님이 **월별**로 바꿈. 앞으로의 자동 실행은 계속 **주간**.
+- 주소: 같은 링크 맨 위 [주간 | 월간] 전환 → `docs/monthly/index.html`, `docs/monthly/reports/YYYY-MM.html`
+- 한 달 대표 패션 기사 약 300개 (판정 후보 약 360개 = 매체별 `backfill.WEEKLY_QUOTA` × 3, 날짜가 고르게)
+- 순서:
+  1. 과거 기사 모으기: `python tools/backfill.py --start 2026-01-01 --end 2026-08-31` (매체끼리 동시에, 매체마다 1.5초 간격, 약 30분)
+     - 보그·W·GQ 코리아: RSS 지난 페이지(?paged=N) / 허스트(엘르·바자·에스콰이어·멘즈헬스): sitemap_index의 content.*.xml.gz 중 패션 경로 / W: sitemaps/pages / 하이스노바이어티: sitemap-content-articles / 엘르·바자·에스콰이어 코리아: /sitemap/sitemap.xml / 하입비스트·코리아: sitemap-post-YYYY-MM.xml
+     - 페이지가 필요한 매체는 기사 페이지 표준 태그(og:title·og:image·datePublished·articleSection)로 채움
+     - BoF는 사이트맵이 주제별로만 있어 과거에서는 뺌
+  2. 판정: `label_queue.py --next --month YYYY-MM` → 묶음 작성 → `--merge .tmp/batchN.json --month YYYY-MM` (주간과 같은 기준)
+  3. 월간 트렌드 문장: `data/monthly_notes.json`에 YYYY-MM 키로 (주간과 같은 형식: period_note, 여성·남성 각 5개 {title, text, keys})
+  4. 리포트: `python tools/build_report.py --month YYYY-MM` (지난달 대비 ▲ 표시)
+
 ## 리포트 구성
 [여성 | 남성] × [전체 | 국내 | 해외] 전환. 주소 끝 `#남성/rw/해외`처럼 성별/탭/지역으로 특정 화면 공유(탭: sum 요약, kw 키워드, cm 컬러·소재, rw 런웨이, art 기사 모음).
 1. 이번 주 요약 — 숫자 카드 + 트렌드 5개마다 사진 무드보드(키워드 겹침 많은 순, 트렌드끼리 사진 중복 없음)
@@ -72,4 +85,5 @@ msedge --headless=new --disable-gpu --virtual-time-budget=20000 --user-data-dir=
 판정·트렌드 문장·리포트는 주 1회 대화에서(유료 API 없음).
 
 ## 변경 기록
+- 2026-09-26: 과거 1~8월 월간 리포트 추가(backfill.py, build_report --month, label_queue --month). 주간/월간 전환.
 - 2026-09-26: 프로젝트 시작. 매체 15곳 확정(남성지는 사장님 요청으로 추가), 첫 주 362개 판정(패션 257개), 사진 중심 리포트.
