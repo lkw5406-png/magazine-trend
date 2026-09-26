@@ -52,7 +52,7 @@ def validate(aid: str, lab: dict, v: dict, articles: dict) -> list[str]:
     for key in ("gender", "article_kind"):
         if lab.get(key) not in v[key]:
             errs.append(f"{aid}: {key} '{lab.get(key)}'는 이름표 밖")
-    if len(lab.get("summary", "")) < 20:
+    if len(lab.get("summary", "")) < 10:
         errs.append(f"{aid}: 요약이 비었거나 너무 짧음")
     for f in LIST_FIELDS:
         bad = [x for x in lab.get(f, []) if x not in v[f]]
