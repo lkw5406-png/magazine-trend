@@ -85,5 +85,6 @@ msedge --headless=new --disable-gpu --virtual-time-budget=20000 --user-data-dir=
 판정·트렌드 문장·리포트는 주 1회 대화에서(유료 API 없음).
 
 ## 변경 기록
+- 2026-09-26: 9월 1~19일 공백을 주간 리포트 3개(9/5·9/12·9/19 주)로 채움 — backfill.py --unit week (주당 약 100개 표본). 표본이라 9/26 주(전체 수집)보다 기사 수가 적음.
 - 2026-09-26: 과거 1~8월 월간 리포트 추가(backfill.py, build_report --month, label_queue --month). 주간/월간 전환.
 - 2026-09-26: 프로젝트 시작. 매체 15곳 확정(남성지는 사장님 요청으로 추가), 첫 주 362개 판정(패션 257개), 사진 중심 리포트.
