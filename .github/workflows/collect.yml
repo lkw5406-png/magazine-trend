@@ -1,0 +1,46 @@
+# 매거진 기사 자동 수집 (요약·판정·리포트는 주 1회 Claude Code 대화에서 — workflows/magazine_weekly_report.md)
+# - 매일 한국시간 07:00: 15개 매체 전부
+# - 3시간마다: 피드에 최근 기사만 몇 개 보여주는 매체 (엘르·바자·에스콰이어·하입비스트 코리아, 하이스노바이어티) — 빠짐 방지
+name: magazine-collect
+
+on:
+  schedule:
+    - cron: "0 22 * * *"    # UTC 22:00 = KST 07:00 — 전체 수집
+    - cron: "30 */3 * * *"  # 3시간마다 30분 — 피드가 짧은 매체만
+  workflow_dispatch:         # Actions 탭에서 수동 실행 (전체 수집)
+
+permissions:
+  contents: write
+
+concurrency:
+  group: magazine-collect
+  cancel-in-progress: false
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    # 실패하면 GitHub이 저장소 주인 계정 이메일로 자동 알림
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: 기사 수집
+        run: |
+          if [ "${{ github.event.schedule }}" = "30 */3 * * *" ]; then
+            python tools/fetch_articles.py --only elle_kr,bazaar_kr,esquire_kr,hypebeast_kr,highsnobiety
+          else
+            python tools/fetch_articles.py
+          fi
+
+      - name: 저장(push)
+        run: |
+          git config user.name "magazine-collect-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add data/articles.json
+          git commit -m "collect $(TZ=Asia/Seoul date '+%F %H:%M')" || { echo "새 기사 없음"; exit 0; }
+          git pull --rebase
+          git push

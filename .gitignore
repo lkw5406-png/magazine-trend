@@ -1,0 +1,11 @@
+# 비밀 정보
+.env
+credentials.json
+token.json
+
+# 임시 작업 공간
+.tmp/
+
+# 파이썬 부산물
+__pycache__/
+*.pyc
