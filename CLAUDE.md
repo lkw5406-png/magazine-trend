@@ -132,6 +132,7 @@ workflows/          # Workflow. 각 업무의 단계별 지시서.
 tools/              # Tool. 행동을 실행하는 파이썬 파일.
 .tmp/               # 작업 공간. 임시 데이터, 중간 파일. 언제든 버려도 됨.
 .env                # 비밀. API 키와 인증 정보. 민감 데이터는 오직 여기만.
+                    #   실제 위치: %USERPROFILE%\.secrets\magazine-trend.env (OneDrive 동기화 밖. 새 PC 이사 때 따로 옮길 것)
 credentials.json    # OAuth 인증 (gitignore 처리됨)
 token.json          # OAuth 토큰 (gitignore 처리됨)
 ```
