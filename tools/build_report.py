@@ -26,6 +26,11 @@ MONTHLY_NOTES_PATH = DATA_DIR / "monthly_notes.json"  # 월간 핵심 트렌드 
 
 LIST_FIELDS = ("items", "styles", "details", "colors", "materials", "brands")
 
+# 리포트에서 빼는 아이템 (2026-10-11 사장님 결정): 스니커즈는 늘 많이 언급되는 베이직 아이템이라 트렌드로 보지 않음.
+# 이 아이템만 다룬 기사(신상 발매 소식 등)는 리포트에서 통째로 빼고, 다른 아이템과 같이 나온 기사는 이 이름표만 뗌.
+# 판정표(data/article_labels.json)는 그대로 둠 — 여기서 이름을 빼면 다음 리포트부터 다시 나옴.
+EXCLUDE_ITEMS = {"스니커즈"}
+
 # 컬러 이름표 → 견본 색 (무신사 리포트와 같은 이름)
 SWATCH = {"블랙": "#111111", "화이트": "#f7f7f5", "아이보리/크림": "#efe6d2", "그레이/차콜": "#6e6e6e", "네이비": "#1f2a4a",
           "블루/인디고": "#3b5ea8", "브라운/카멜": "#8a5a36", "베이지/샌드": "#d6c3a0", "카키/올리브": "#6b6b3a",
@@ -61,13 +66,26 @@ def rows_for(articles: dict, labels: dict, start: str, end: str, full: bool) -> 
         a = articles.get(aid)
         if not a or not lab.get("fashion") or not (start <= a["date"] <= end):
             continue
+        items = lab.get("items", [])
+        if items and all(i in EXCLUDE_ITEMS for i in items):
+            continue
         row = {"g": lab["gender"], "r": a["region"], **{f[:3]: lab.get(f, []) for f in LIST_FIELDS}}
+        row["ite"] = [i for i in items if i not in EXCLUDE_ITEMS]
         if full:
             row.update({"id": aid, "t": a["title"], "s": a["source_name"], "d": a["date"], "u": a["link"],
                         "img": a.get("image", ""), "sum": lab["summary"], "k": lab["article_kind"],
                         "sea": lab.get("season", "")})
         out.append(row)
     return sorted(out, key=lambda r: r.get("d", ""), reverse=True)
+
+
+def clean_notes(notes: dict) -> dict:
+    """핵심 트렌드 문장에서 빼는 아이템 이름표를 떼고, 그것만 다룬 트렌드는 뺌 (안전장치)."""
+    out = dict(notes)
+    for g in ("여성", "남성"):
+        kept = [{**n, "keys": [k for k in n["keys"] if k not in EXCLUDE_ITEMS]} for n in notes.get(g, [])]
+        out[g] = [n for n in kept if n["keys"]]
+    return out
 
 
 CSS = """
@@ -343,7 +361,7 @@ def build(date: str) -> Path:
     monthly = len(date) == 7
     base = DOCS_DIR / "monthly" if monthly else DOCS_DIR
     articles, labels = load_json(ARTICLES_PATH, {}), load_json(LABELS_PATH, {})
-    notes = load_json(MONTHLY_NOTES_PATH if monthly else NOTES_PATH, {}).get(date, {})
+    notes = clean_notes(load_json(MONTHLY_NOTES_PATH if monthly else NOTES_PATH, {}).get(date, {}))
     kinds = load_json(Path(__file__).resolve().parent / "trend_keywords.json", {})["article_kind"]
     n_sources = len(load_json(SOURCES_PATH, {})["sources"])
     rows = rows_for(articles, labels, *span(date), full=True)

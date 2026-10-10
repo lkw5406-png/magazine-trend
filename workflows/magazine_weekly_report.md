@@ -19,7 +19,7 @@ Python: 사장님 PC는 `C:/Users/이채은/.local/bin/python3.14.exe` (Windows�
 | 2. 판정 묶음 뽑기 | `python tools/label_queue.py --next --date 리포트날짜 --size 60` | `.tmp/to_label.json` |
 | 3. **Claude 판정** | 묶음을 읽고 `.tmp/batchN.json` 작성 → `python tools/label_queue.py --merge .tmp/batchN.json --date 리포트날짜` | `data/article_labels.json` |
 | 4. 반복 | 2~3을 "남은 것 0개"까지. 마지막에 `--check` | 문제 없음 확인 |
-| 5. 주간 트렌드 문장 | 집계를 보고 `data/weekly_notes.json`에 여성·남성 각 5개 트렌드 작성 (title, text, keys) | 리포트 요약 탭 무드보드 |
+| 5. 주간 트렌드 문장 | 집계를 보고 `data/weekly_notes.json`에 여성·남성 각 5개 트렌드 작성 (title, text, keys). **스니커즈는 주제로 쓰지 않음**(아래 '스니커즈는 리포트에서 뺌') | 리포트 요약 탭 무드보드 |
 | 6. 리포트 | `python tools/build_report.py --date 리포트날짜` | `docs/index.html`, `docs/reports/날짜.html`, `docs/dates.json` |
 | 7. 화면 점검 | Edge 헤드리스 캡처 (아래) | PC·휴대폰 확인 |
 | 8. 올리기 | `git add data docs tools workflows` → 커밋 → `git push` | 고정 링크에 반영 (1~2분 뒤) |
@@ -33,6 +33,13 @@ Python: 사장님 PC는 `C:/Users/이채은/.local/bin/python3.14.exe` (Windows�
 - **성별**: 옷의 대상 기준. 여성 셀럽 룩 = 여성, 남성복 기사 = 남성, 스니커즈 발매·브랜드 전체 뉴스 = 공용. (리포트에서 여성 = 여성+공용, 남성 = 남성+공용)
 - **이름표**: `tools/trend_keywords.json` 안에서만. 영어도 한국어 이름표로(burgundy → 레드/버건디). 없는 게 필요하면 이름표에 먼저 추가(추가 기록: 크링클/시어서커, 헤어리, 배색, 트랙 재킷).
 - **요약**: 한국어 1~2문장, 디자이너가 알아야 할 것(무엇이·어떤 디테일/소재/컬러로·왜 뜨는지). 원문 문장을 옮기지 말고 새로 씀.
+
+## 스니커즈는 리포트에서 뺌 (2026-10-11 사장님 결정)
+스니커즈는 늘 많이 언급되는 베이직 아이템이라 트렌드가 아님. 매주 1위로 잡혀 핵심 트렌드를 가리던 문제.
+- **판정은 그대로**: 스니커즈 기사에는 지금처럼 `스니커즈` 이름표를 붙임(그래야 도구가 골라냄). 스니커즈만 다룬 기사에 다른 아이템 이름표를 억지로 붙이지 말 것.
+- **리포트 도구가 자동으로 뺌** (`tools/build_report.py`의 `EXCLUDE_ITEMS`): 아이템이 스니커즈뿐인 기사(신상 발매 소식 등)는 통째로 빠짐 → 기사 수·컬러·소재·스타일 순위에도 안 들어감. 다른 아이템과 같이 나온 기사는 남고 스니커즈 이름표만 떨어짐.
+- **핵심 트렌드 문장(5단계)**: 스니커즈를 주제로 쓰지 않고 keys에도 넣지 않음. 문장에 넣는 건수는 스니커즈를 뺀 뒤의 숫자(리포트 화면에 보이는 숫자)로.
+- 되돌리거나 다른 아이템도 빼려면 `EXCLUDE_ITEMS`만 고친 뒤 리포트를 다시 만들면 됨(판정표는 건드리지 않았음). 러닝화는 빼지 않았음 — 사장님이 말씀하시면 추가.
 
 ## 매체 (`tools/sources.json`, 15곳)
 해외 패션지 ELLE·Harper's BAZAAR·W / 해외 남성지 Esquire·Men's Health / 국내 보그·W·GQ·엘르·바자·에스콰이어 코리아 / 트렌드 매체 Hypebeast·하입비스트 코리아·Highsnobiety·BoF.
@@ -85,6 +92,7 @@ msedge --headless=new --disable-gpu --virtual-time-budget=20000 --user-data-dir=
 판정·트렌드 문장·리포트는 주 1회 대화에서(유료 API 없음).
 
 ## 변경 기록
+- 2026-10-11: 스니커즈를 리포트에서 뺌(사장님 결정). build_report.py에 EXCLUDE_ITEMS 추가, 스니커즈가 들어간 주간·월간 핵심 트렌드 문장을 다시 쓰고 지난 리포트 14개(주간 6·월간 8)를 전부 다시 만듦.
 - 2026-09-26: 9월 1~19일 공백을 주간 리포트 3개(9/5·9/12·9/19 주)로 채움 — backfill.py --unit week (주당 약 100개 표본). 표본이라 9/26 주(전체 수집)보다 기사 수가 적음.
 - 2026-09-26: 과거 1~8월 월간 리포트 추가(backfill.py, build_report --month, label_queue --month). 주간/월간 전환.
 - 2026-09-26: 프로젝트 시작. 매체 15곳 확정(남성지는 사장님 요청으로 추가), 첫 주 362개 판정(패션 257개), 사진 중심 리포트.
