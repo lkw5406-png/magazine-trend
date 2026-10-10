@@ -8,6 +8,8 @@
    "items": [...], "styles": [...], "details": [...], "colors": [...], "materials": [...],  # 이름표 안에서만
    "brands": [...], "season": "2027SS" 등 (없으면 "")}
 패션이 아니면 {"fashion": false} 만 적어도 됨.
+신상 출시 홍보 기사(특정 제품·협업·캡슐의 출시 소식)는 {"fashion": false, "promo": true} 만 적음 → 리포트에서 빠짐.
+  (2026-10-11 이전 기사는 fashion: true 인 채로 "promo": true 만 덧붙여 둠 — build_report.py가 둘 다 뺌)
 
 사용법:
   python tools/label_queue.py --next [--size 60]     다음 묶음을 .tmp/to_label.json 으로 (이번 주 기사 중 판정 안 된 것)
@@ -47,6 +49,8 @@ def validate(aid: str, lab: dict, v: dict, articles: dict) -> list[str]:
         errs.append(f"{aid}: 모은 기사에 없는 id")
     if not isinstance(lab.get("fashion"), bool):
         errs.append(f"{aid}: fashion은 true/false")
+    if not isinstance(lab.get("promo", False), bool):
+        errs.append(f"{aid}: promo는 true/false")
     if not lab.get("fashion"):
         return errs
     for key in ("gender", "article_kind"):

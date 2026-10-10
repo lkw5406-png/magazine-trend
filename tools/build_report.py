@@ -66,6 +66,9 @@ def rows_for(articles: dict, labels: dict, start: str, end: str, full: bool) -> 
         a = articles.get(aid)
         if not a or not lab.get("fashion") or not (start <= a["date"] <= end):
             continue
+        # 신상 출시 홍보 기사(특정 제품·협업·캡슐의 출시 소식)는 품목과 상관없이 뺌 (2026-10-11 사장님 결정). 판정표의 promo 표시.
+        if lab.get("promo"):
+            continue
         items = lab.get("items", [])
         if items and all(i in EXCLUDE_ITEMS for i in items):
             continue
